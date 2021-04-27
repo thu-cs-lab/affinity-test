@@ -39,37 +39,43 @@ int main(int argc, char *argv[]) {
   MPI_Barrier(MPI_COMM_WORLD);
 
   // get thread affinity
-  cpu_set_t *thread_masks = new cpu_set_t[omp_get_max_threads()];
-  if (rank == 0) {
+  int num_threads = omp_get_max_threads();
+  cpu_set_t *all_masks = new cpu_set_t[num_threads + 1];
+
 #pragma omp parallel for schedule(static, 1)
-    for (int i = 0; i < omp_get_max_threads(); i++) {
-      CPU_ZERO(&thread_masks[i]);
-      assert(pthread_getaffinity_np(pthread_self(), sizeof(cpu_set_t),
-                                    &thread_masks[i]) == 0);
-    }
+  for (int i = 0; i < num_threads; i++) {
+    CPU_ZERO(&all_masks[i + 1]);
+    assert(pthread_getaffinity_np(pthread_self(), sizeof(cpu_set_t),
+                                  &all_masks[i + 1]) == 0);
   }
 
   // get process affinity
-  cpu_set_t process_mask;
-  CPU_ZERO(&process_mask);
-  assert(sched_getaffinity(0, sizeof(cpu_set_t), &process_mask) == 0);
+  CPU_ZERO(&all_masks[0]);
+  assert(sched_getaffinity(0, sizeof(cpu_set_t), &all_masks[0]) == 0);
 
-  // generate description based on affinity
-  char buffer[1024] = {0};
-  affinity_to_string(&mask, buffer);
-
-  char *root_buffer = NULL;
+  cpu_set_t *root_buffer = NULL;
   if (rank == 0) {
-    root_buffer = new char[sizeof(buffer) * size];
+    root_buffer = new cpu_set_t[(num_threads + 1) * size];
+    memset(root_buffer, 0, sizeof(cpu_set_t) * (num_threads + 1) * size);
   }
-  MPI_Gather(buffer, sizeof(buffer), MPI_CHAR, root_buffer, sizeof(buffer),
-             MPI_CHAR, 0, MPI_COMM_WORLD);
+  MPI_Gather(all_masks, sizeof(cpu_set_t) * (num_threads + 1), MPI_CHAR,
+             root_buffer, sizeof(cpu_set_t) * (num_threads + 1), MPI_CHAR, 0,
+             MPI_COMM_WORLD);
   if (rank == 0) {
+    char buffer[1024];
     for (int i = 0; i < size; i++) {
-      printf("Rank %d:%s\n", i, &root_buffer[i * sizeof(buffer)]);
+      buffer[0] = 0;
+      affinity_to_string(&root_buffer[i * (num_threads + 1)], buffer);
+      printf("Rank %d Process: %s\n", i, buffer);
+      for (int j = 1; j <= num_threads; j++) {
+        buffer[0] = 0;
+        affinity_to_string(&root_buffer[i * (num_threads + 1) + j], buffer);
+        printf("Rank %d Thread %d: %s\n", i, j, buffer);
+      }
     }
     delete[] root_buffer;
   }
+  delete[] all_masks;
 
   MPI_Finalize();
   return 0;
