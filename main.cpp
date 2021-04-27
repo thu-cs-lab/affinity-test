@@ -63,16 +63,57 @@ int main(int argc, char *argv[]) {
              MPI_COMM_WORLD);
   if (rank == 0) {
     char buffer[1024];
+    FILE *fp = fopen("affinity.gnuplot", "w");
+    assert(fp);
+    fprintf(fp, "set terminal png\n");
+    fprintf(fp, "set title \"Thread affinity map\"\n");
+    fprintf(fp, "unset key\n");
+    fprintf(fp, "set palette rgbformula -7,2,-7\n");
+    fprintf(fp, "unset colorbox\n");
+    fprintf(fp, "$map << EOD\n");
+    int nproc = get_nprocs();
+    for (int i = 0; i < nproc; i++) {
+      if (i % (nproc / 4) == 0) {
+        fprintf(fp, ",%d", i);
+      } else {
+        fprintf(fp, ",", i);
+      }
+    }
+
     for (int i = 0; i < size; i++) {
+      cpu_set_t *process_affinity = &root_buffer[i * (num_threads + 1)];
+
       buffer[0] = 0;
-      affinity_to_string(&root_buffer[i * (num_threads + 1)], buffer);
+      affinity_to_string(process_affinity, buffer);
       printf("Rank %d Process: %s\n", i, buffer);
+
       for (int j = 1; j <= num_threads; j++) {
+        cpu_set_t *thread_affinity = &root_buffer[i * (num_threads + 1) + j];
+        if (j == 1) {
+          fprintf(fp, "\nRank %d", i);
+        } else {
+          fprintf(fp, "\n");
+        }
+        for (int i = 0; i < nproc; i++) {
+          fprintf(fp, ", %d", CPU_ISSET(i, thread_affinity) != 0);
+        }
+
         buffer[0] = 0;
         affinity_to_string(&root_buffer[i * (num_threads + 1) + j], buffer);
         printf("Rank %d Thread %d: %s\n", i, j, buffer);
       }
     }
+
+    fprintf(fp, "\nEOD\n");
+    fprintf(fp, "set datafile separator comma\n");
+    fprintf(
+        fp,
+        "plot '$map' matrix rowheaders columnheaders using 1:2:3 with image\n");
+    fprintf(fp, "set datafile separator");
+    fclose(fp);
+
+    system("gnuplot affinity.gnuplot > affinity.png");
+
     delete[] root_buffer;
   }
   delete[] all_masks;
