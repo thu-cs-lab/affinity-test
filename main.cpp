@@ -2,6 +2,7 @@
 #include <mpi.h>
 #include <omp.h>
 #include <sched.h>
+#include <string.h>
 #include <stdio.h>
 #include <string>
 #include <sys/sysinfo.h>
