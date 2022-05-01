@@ -1,11 +1,13 @@
-#include <assert.h>
+#include <string>
+#include <cassert>
+#include <cstring>
+#include <cstdio>
+
+#include <sched.h>
+#include <sys/sysinfo.h>
+
 #include <mpi.h>
 #include <omp.h>
-#include <sched.h>
-#include <string.h>
-#include <stdio.h>
-#include <string>
-#include <sys/sysinfo.h>
 
 void affinity_to_string(cpu_set_t *mask, char *buffer) {
   int nproc = get_nprocs();
@@ -28,6 +30,12 @@ void affinity_to_string(cpu_set_t *mask, char *buffer) {
 }
 
 int main(int argc, char *argv[]) {
+
+  bool call_gnuplot = false;
+  if (argc > 1 && strcmp(argv[1], "-p") == 0) {
+    call_gnuplot = true;
+  };
+
   MPI_Init(&argc, &argv);
 
   int size, rank;
@@ -113,9 +121,11 @@ int main(int argc, char *argv[]) {
     fprintf(fp, "set datafile separator");
     fclose(fp);
 
-    system("gnuplot affinity.gnuplot > affinity.png");
-
     delete[] root_buffer;
+
+    if (call_gnuplot) {
+      system("gnuplot affinity.gnuplot > affinity.png");
+    }
   }
   delete[] all_masks;
 

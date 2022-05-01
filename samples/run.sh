@@ -1,6 +1,9 @@
 #!/bin/sh
 set -e
-make
+
 MPIRUN=$(which mpirun)
+
+make
+
 set -x
-$MPIRUN -n 8 --bind-to none ./run_inner.sh
+$MPIRUN -n 8 --bind-to none ./samples/run_inner.sh
