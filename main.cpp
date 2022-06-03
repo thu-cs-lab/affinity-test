@@ -85,7 +85,7 @@ int main(int argc, char *argv[]) {
       if (i % (nproc / 4) == 0) {
         fprintf(fp, ",%d", i);
       } else {
-        fprintf(fp, ",", i);
+        fprintf(fp, ",");
       }
     }
 
@@ -124,7 +124,8 @@ int main(int argc, char *argv[]) {
     delete[] root_buffer;
 
     if (call_gnuplot) {
-      system("gnuplot affinity.gnuplot > affinity.png");
+      int res = system("gnuplot affinity.gnuplot > affinity.png");
+      printf("Called gnuplot with result %d\n", res);
     }
   }
   delete[] all_masks;
