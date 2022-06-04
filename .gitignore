@@ -2,3 +2,4 @@ affinity-test
 .vscode/
 *.png
 *.gnuplot
+result
